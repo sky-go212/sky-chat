@@ -1,0 +1,27 @@
+name = "subserver-chat"
+main = "src/index.js"
+compatibility_date = "2026-06-21"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "SUBSERVER"
+class_name = "SubServer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SubServer"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "subserver-chat"
+database_id = "2aaecc70-8b01-4393-9145-b4b65bc9c3a8"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "8f0d3fbdb8d14e7e970a1d9db574fb5d"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+R2_PUBLIC_URL = "pub-subserver-media.r2.dev"

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.wrangler/
+*.local
+.DS_Store
+*.tsbuildinfo
+ADMIN_CODE.txt
+dist/
