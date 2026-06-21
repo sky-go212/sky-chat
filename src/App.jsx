@@ -1,7 +1,9 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import ChatRoom from './pages/ChatRoom.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import EntryPage from './pages/EntryPage.jsx';
 
 function LoadingScreen() {
   return (
@@ -20,7 +22,35 @@ export default function App() {
   const { user, loading } = useAuth();
 
   if (loading) return <LoadingScreen />;
-  if (!user) return <LoginPage />;
-  if (user.role === 'admin') return <AdminDashboard />;
-  return <ChatRoom />;
+
+  return (
+    <Routes>
+      {/* Root: jika sudah login → ke chat, jika belum → EntryPage */}
+      <Route
+        path="/"
+        element={
+          user
+            ? user.role === 'admin'
+              ? <AdminDashboard />
+              : <Navigate to={`/s/${user.slug || ''}`} replace />
+            : <EntryPage />
+        }
+      />
+
+      {/* Link unik per SubServer */}
+      <Route
+        path="/s/:slug"
+        element={
+          user
+            ? user.role === 'admin'
+              ? <AdminDashboard />
+              : <ChatRoom />
+            : <LoginPage />
+        }
+      />
+
+      {/* Catch-all → root */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }

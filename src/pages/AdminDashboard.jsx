@@ -63,7 +63,7 @@ function CreateSubServerModal({ onClose, onCreated }) {
         </div>
 
         {result ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="rounded-xl p-4 text-center" style={{ background: 'rgba(0,245,160,0.1)', border: '1px solid rgba(0,245,160,0.3)' }}>
               <p className="text-2xl mb-1">✅</p>
               <p className="font-bold" style={{ color: '#00F5A0' }}>SubServer Berhasil Dibuat!</p>
@@ -74,13 +74,24 @@ function CreateSubServerModal({ onClose, onCreated }) {
                 <p className="font-semibold">{result.name}</p>
               </div>
               <div className="glass rounded-xl p-3">
-                <p className="text-xs mb-1" style={{ color: '#8B8B9E' }}>Kode User Utama</p>
-                <p className="font-mono font-bold text-lg tracking-widest" style={{ color: '#FF6B9D' }}>{result.ownerCode}</p>
-                <p className="text-xs mt-1" style={{ color: '#8B8B9E' }}>Kirim kode ini ke pemilik SubServer</p>
+                <p className="text-xs mb-1 flex items-center gap-1" style={{ color: '#8B8B9E' }}>
+                  🔗 Link Unik SubServer
+                </p>
+                <p className="font-mono text-xs break-all" style={{ color: '#00F5FF' }}>
+                  {window.location.origin}/s/{result.slug}
+                </p>
+                <p className="text-xs mt-1" style={{ color: '#8B8B9E' }}>Bagikan link ini ke semua anggota</p>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/s/${result.slug}`)}
+                  className="mt-2 w-full py-1.5 rounded-lg text-xs font-semibold glass"
+                >
+                  📋 Salin Link
+                </button>
               </div>
               <div className="glass rounded-xl p-3">
-                <p className="text-xs mb-1" style={{ color: '#8B8B9E' }}>ID SubServer</p>
-                <p className="font-mono text-sm" style={{ color: '#00F5FF' }}>{result.subId}</p>
+                <p className="text-xs mb-1" style={{ color: '#8B8B9E' }}>Kode User Utama (pemilik SubServer)</p>
+                <p className="font-mono font-bold text-lg tracking-widest" style={{ color: '#FF6B9D' }}>{result.ownerCode}</p>
+                <p className="text-xs mt-1" style={{ color: '#8B8B9E' }}>Kirim kode ini + link di atas ke pemilik SubServer</p>
               </div>
             </div>
             <button onClick={onClose} className="w-full py-3 rounded-xl font-bold" style={{ background: 'linear-gradient(135deg, #FF6B9D, #FF8E53)' }}>Selesai</button>
@@ -231,6 +242,20 @@ export default function AdminDashboard() {
                     {ss.active ? 'Nonaktifkan' : 'Aktifkan'}
                   </button>
                 </div>
+                {ss.slug && (
+                  <div className="mb-2 flex items-center gap-2">
+                    <p className="font-mono text-xs truncate flex-1" style={{ color: '#00F5FF' }}>
+                      /s/{ss.slug}
+                    </p>
+                    <button
+                      onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/s/${ss.slug}`)}
+                      className="text-xs px-2 py-0.5 rounded glass flex-shrink-0"
+                      style={{ color: '#00F5FF' }}
+                    >
+                      📋
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center gap-3 text-xs" style={{ color: '#8B8B9E' }}>
                   <span>👥 {ss.contactCount || 0}/{ss.maxContacts} kontak</span>
                   <span>•</span>

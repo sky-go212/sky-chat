@@ -8,6 +8,16 @@ function generateParent() {
   return r;
 }
 
+function generateSlug() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let r = '';
+  for (let i = 0; i < 8; i++) {
+    if (i === 4) r += '-';
+    r += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return r;
+}
+
 async function getNextSubId(kv) {
   const raw = await kv.get('admin:subserver_counter');
   const n = raw ? parseInt(raw) + 1 : 1;
@@ -29,11 +39,14 @@ export async function handleAdmin(request, env, pathname, session) {
     const parent = generateParent();
     const subId = await getNextSubId(env.KV);
     const ownerCode = `UTAMA-${parent}-001`;
+    const slug = generateSlug();
     const expiresAt = new Date(Date.now() + expiryDays * 86400000).toISOString();
 
-    const ssData = { name: name.trim(), subId, ownerCode, maxContacts, expiresAt, active: true, contactCount: 0, createdAt: new Date().toISOString() };
+    const ssData = { name: name.trim(), subId, ownerCode, slug, maxContacts, expiresAt, active: true, contactCount: 0, createdAt: new Date().toISOString() };
     await setSubServer(env.KV, ownerCode, ssData);
     await env.KV.put(`subid:${subId}`, ownerCode);
+    // slug → data mapping untuk lookup publik
+    await env.KV.put(`slug:${slug}`, JSON.stringify({ subId, ownerCode, name: name.trim() }));
 
     // Buat tabel D1 untuk SubServer baru
     try {
@@ -48,7 +61,7 @@ export async function handleAdmin(request, env, pathname, session) {
       ]);
     } catch (e) { console.error('DB init error:', e.message); }
 
-    await auditLog(env.DB, 'subserver_created', { name, ownerCode, subId });
+    await auditLog(env.DB, 'subserver_created', { name, ownerCode, subId, slug });
     return new Response(JSON.stringify({ success: true, subServer: ssData }), { headers: cors });
   }
 

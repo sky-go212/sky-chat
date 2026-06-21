@@ -31,11 +31,11 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = useCallback(async (code) => {
+  const login = useCallback(async (code, slug = null) => {
     const res = await fetch(`${API_BASE}/api/auth/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: code.toUpperCase() })
+      body: JSON.stringify({ code: code.toUpperCase(), slug })
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Kode tidak valid');

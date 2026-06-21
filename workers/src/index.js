@@ -50,8 +50,24 @@ export default {
         return await stub.fetch(request);
       }
 
+      // Public: lookup SubServer by slug (tanpa auth)
+      if (pathname.startsWith('/api/s/') && request.method === 'GET') {
+        const slug = pathname.slice(7);
+        if (!slug) {
+          response = new Response(JSON.stringify({ success: false, error: 'Slug diperlukan' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        } else {
+          const raw = await env.KV.get(`slug:${slug}`);
+          if (!raw) {
+            response = new Response(JSON.stringify({ success: false, error: 'SubServer tidak ditemukan' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+          } else {
+            const data = JSON.parse(raw);
+            // Hanya return nama — tidak boleh ada info sensitif
+            response = new Response(JSON.stringify({ success: true, name: data.name, slug }), { headers: { 'Content-Type': 'application/json' } });
+          }
+        }
+      }
       // Auth endpoints (tidak perlu session)
-      if (pathname.startsWith('/api/auth/')) {
+      else if (pathname.startsWith('/api/auth/')) {
         response = await handleAuth(request, env, pathname);
       }
       // Admin endpoints

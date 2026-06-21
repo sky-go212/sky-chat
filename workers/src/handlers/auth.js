@@ -11,10 +11,18 @@ export async function handleAuth(request, env, pathname) {
     const allowed = await checkRateLimit(env.KV, `rate:${ip}`, 5, 900);
     if (!allowed) return new Response(JSON.stringify({ success: false, error: 'Terlalu banyak percobaan. Coba lagi 15 menit lagi.' }), { status: 429, headers: cors });
 
-    const { code } = await request.json();
+    const { code, slug } = await request.json();
     if (!code) return new Response(JSON.stringify({ success: false, error: 'Kode diperlukan' }), { status: 400, headers: cors });
 
     const upperCode = code.toUpperCase().trim();
+
+    // Jika ada slug, validasi kode harus milik SubServer tersebut
+    let expectedSubId = null;
+    if (slug) {
+      const slugRaw = await env.KV.get(`slug:${slug}`);
+      if (!slugRaw) return new Response(JSON.stringify({ success: false, error: 'Link SubServer tidak valid' }), { status: 404, headers: cors });
+      expectedSubId = JSON.parse(slugRaw).subId;
+    }
 
     // Cek admin
     if (upperCode.startsWith('ADMIN-')) {
@@ -32,31 +40,54 @@ export async function handleAuth(request, env, pathname) {
     if (upperCode.startsWith('UTAMA-')) {
       const ss = await getSubServer(env.KV, upperCode);
       if (!ss || !ss.active) return new Response(JSON.stringify({ success: false, error: 'Kode tidak valid atau SubServer tidak aktif' }), { status: 401, headers: cors });
-      const token = await signJWT({ role: 'utama', contactCode: upperCode, subServerId: ss.subId, subServerName: ss.name }, env.JWT_SECRET);
-      await setSession(env.KV, token, { role: 'utama', contactCode: upperCode, subServerId: ss.subId, subServerName: ss.name });
+      // Isolasi: kode UTAMA harus cocok dengan SubServer di slug
+      if (expectedSubId && ss.subId !== expectedSubId) {
+        return new Response(JSON.stringify({ success: false, error: 'Kode tidak valid untuk SubServer ini' }), { status: 403, headers: cors });
+      }
+      const token = await signJWT({ role: 'utama', contactCode: upperCode, subServerId: ss.subId, subServerName: ss.name, slug: ss.slug }, env.JWT_SECRET);
+      await setSession(env.KV, token, { role: 'utama', contactCode: upperCode, subServerId: ss.subId, subServerName: ss.name, slug: ss.slug });
       await auditLog(env.DB, 'utama_login', { code: upperCode, subId: ss.subId, ip });
-      return new Response(JSON.stringify({ success: true, role: 'utama', token, session: { role: 'utama', contactCode: upperCode, subServerId: ss.subId, subServerName: ss.name } }), { headers: cors });
+      return new Response(JSON.stringify({ success: true, role: 'utama', token, session: { role: 'utama', contactCode: upperCode, subServerId: ss.subId, subServerName: ss.name, slug: ss.slug } }), { headers: cors });
     }
 
     // Cek Kontak USR-
     if (upperCode.startsWith('USR-')) {
-      // Cari di semua subserver (scan KV prefix)
+      // Jika ada slug: cari hanya di SubServer tersebut (lebih efisien & aman)
+      if (expectedSubId) {
+        const ownerRaw = await env.KV.get(`subid:${expectedSubId}`);
+        const ownerCode = ownerRaw ? ownerRaw.trim() : null;
+        if (ownerCode) {
+          const key = `sub:${expectedSubId}:contact:${ownerCode}:${upperCode}`;
+          const raw = await env.KV.get(key);
+          const contact = raw ? JSON.parse(raw) : null;
+          if (contact && contact.active) {
+            const ss = await getSubServer(env.KV, ownerCode);
+            if (ss && ss.active) {
+              const token = await signJWT({ role: 'kontak', contactCode: upperCode, subServerId: expectedSubId, subServerName: ss.name, name: contact.name, slug: ss.slug }, env.JWT_SECRET);
+              await setSession(env.KV, token, { role: 'kontak', contactCode: upperCode, subServerId: expectedSubId, subServerName: ss.name, name: contact.name, slug: ss.slug });
+              await auditLog(env.DB, 'kontak_login', { code: upperCode, subId: expectedSubId, ip });
+              return new Response(JSON.stringify({ success: true, role: 'kontak', token, session: { role: 'kontak', contactCode: upperCode, subServerId: expectedSubId, subServerName: ss.name, name: contact.name, slug: ss.slug } }), { headers: cors });
+            }
+          }
+        }
+        return new Response(JSON.stringify({ success: false, error: 'Kode tidak valid untuk SubServer ini' }), { status: 401, headers: cors });
+      }
+      // Tanpa slug: scan semua (admin/debug fallback)
       const list = await env.KV.list({ prefix: 'sub:' });
       for (const key of list.keys) {
         if (key.name.endsWith(`:${upperCode}`)) {
           const raw = await env.KV.get(key.name);
           const contact = raw ? JSON.parse(raw) : null;
           if (!contact || !contact.active) continue;
-          // key format: sub:{subId}:contact:{ownerCode}:{contactCode}
           const parts = key.name.split(':');
           const subId = parts[1];
           const ownerCode = parts[3];
           const ss = await getSubServer(env.KV, ownerCode);
           if (!ss || !ss.active) continue;
-          const token = await signJWT({ role: 'kontak', contactCode: upperCode, subServerId: subId, subServerName: ss.name, name: contact.name }, env.JWT_SECRET);
-          await setSession(env.KV, token, { role: 'kontak', contactCode: upperCode, subServerId: subId, subServerName: ss.name, name: contact.name });
+          const token = await signJWT({ role: 'kontak', contactCode: upperCode, subServerId: subId, subServerName: ss.name, name: contact.name, slug: ss.slug }, env.JWT_SECRET);
+          await setSession(env.KV, token, { role: 'kontak', contactCode: upperCode, subServerId: subId, subServerName: ss.name, name: contact.name, slug: ss.slug });
           await auditLog(env.DB, 'kontak_login', { code: upperCode, subId, ip });
-          return new Response(JSON.stringify({ success: true, role: 'kontak', token, session: { role: 'kontak', contactCode: upperCode, subServerId: subId, subServerName: ss.name, name: contact.name } }), { headers: cors });
+          return new Response(JSON.stringify({ success: true, role: 'kontak', token, session: { role: 'kontak', contactCode: upperCode, subServerId: subId, subServerName: ss.name, name: contact.name, slug: ss.slug } }), { headers: cors });
         }
       }
       return new Response(JSON.stringify({ success: false, error: 'Kode tidak valid' }), { status: 401, headers: cors });
