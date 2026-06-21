@@ -19,7 +19,8 @@ export async function handleAuth(request, env, pathname) {
     // Cek admin
     if (upperCode.startsWith('ADMIN-')) {
       const adminSecret = await env.KV.get('admin:secret');
-      if (!adminSecret || upperCode !== adminSecret) {
+      const trimmedSecret = adminSecret ? adminSecret.trim() : null;
+      if (!trimmedSecret || upperCode !== trimmedSecret) {
         return new Response(JSON.stringify({ success: false, error: 'Kode tidak valid' }), { status: 401, headers: cors });
       }
       const token = await signJWT({ role: 'admin', code: upperCode }, env.JWT_SECRET);
